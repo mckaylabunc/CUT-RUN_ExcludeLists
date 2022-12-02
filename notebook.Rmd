@@ -1,0 +1,74 @@
+```{r setup}
+library(magrittr)
+library(ggplot2)
+library(GenomicRanges)
+source('~/NystLib/R/peakUtils.R')
+
+```
+
+
+```{r sheet}
+sampleSheet <- read.csv('sheets/sampleSheet.tsv', header = T, sep = '\t') %>%
+  dplyr::mutate(fraction = stringr::str_split_fixed(sample,'-',n=5)[,5], 
+                ab = stringr::str_split_fixed(sample,'-',n=5)[,4], 
+                genotype = stringr::str_split_fixed(sample,'-',n=5)[,1], .before = 1,
+                grp = paste(genotype,ab,fraction,rep, sep = '.'))
+sampleSheet
+
+```
+#Macs peaks shared across neg controls
+- Currently just using sup data
+1. get peaks by grp, eg. yw.igg.sup.rep1
+2. expand ranges of all peaks by 500 bp both directions 
+  - a less conservative approach would also be fine (ie. no expansion) but this does seem to better capture regions with small neg peaks that poorly overlap
+3. reduce all grp granges
+4. annotate peak df by identifying overlaps of individual peak sets with union set, using GRanges function %over%  
+5. annotate "shared" peaks - those that overlap the union in all datasets
+6. filter by "shared" and write out bed file
+
+This approach is pretty conservative, it only produces a list of ~80 some peaks. 
+Compared to Nordin et al. 2022 which kept regions present in >=30% of datasets. Though they used ~20 datasets I believe, and primarily only used IgG samples. 
+
+
+```{r exclude-peaks}
+
+peaks <- getPeakData(sampleSheet %>% dplyr::filter(fraction == 'sup'), by = 'grp', narrowPeak_colname = 'peak_allFrags')
+
+pg <- peaks %>% 
+  GRanges() %>%
+  + 500 %>%
+  split(., mcols(.)$grp)
+
+pgr <- lapply(pg, function(x) {x %>% reduce()}) %>%
+  GRangesList()
+
+macs.ex <- pgr %>%
+  unlist() %>%
+  reduce() %>%
+  data.frame() %>%
+  dplyr::mutate(peak = 1:nrow(.),
+                yw.igg.1 = ifelse(GRanges(.) %over% pgr$yw.IgG.sup.Rep1, T, F),
+                yw.igg.2 = ifelse(GRanges(.) %over% pgr$yw.IgG.sup.Rep2, T, F),
+                or.igg.1 = ifelse(GRanges(.) %over% pgr$OR.IgG.sup.Rep1, T, F),
+                aFlag.1 = ifelse(GRanges(.) %over% pgr$yw.aFlag.sup.Rep1, T, F),
+                aFlag.2 = ifelse(GRanges(.) %over% pgr$yw.aFlag.sup.Rep2, T, F),
+                aGFP.1 = ifelse(GRanges(.) %over% pgr$yw.aGFP.sup.Rep1, T, F),
+                aGFP.2 = ifelse(GRanges(.) %over% pgr$yw.aGFP.sup.Rep2, T, F),
+                shared = ifelse(yw.igg.1 &
+                                yw.igg.2 &
+                                or.igg.1 &
+                                aFlag.1 &
+                                aFlag.2 &
+                                aGFP.1 &
+                                aGFP.2, T, F)) %>%
+  dplyr::filter(shared)
+
+write.table(macs.ex [1:3], 'macs2-ex.bed', col.names = F, row.names = F, quote = F)                
+
+
+```
+
+
+#what's control peak overlap? - venn
+#what peaks are most consistent?
+- could be an intersect of all datasets - only peaks shared across all 7?
