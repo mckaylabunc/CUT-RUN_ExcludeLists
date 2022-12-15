@@ -61,7 +61,7 @@ macs.ex <- pgr %>%
                                 aFlag.2 &
                                 aGFP.1 &
                                 aGFP.2, T, F)) %>%
-  dplyr::filter(shared)
+  dplyr::filter(shared & seqnames != 'chrM')
 
 write.table(macs.ex [1:3], 'rOut/macs2-ex.bed', col.names = F, row.names = F, quote = F, sep = '\t')                
 
