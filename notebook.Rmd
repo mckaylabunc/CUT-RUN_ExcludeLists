@@ -63,7 +63,7 @@ macs.ex <- pgr %>%
                                 aGFP.2, T, F)) %>%
   dplyr::filter(shared)
 
-write.table(macs.ex [1:3], 'macs2-ex.bed', col.names = F, row.names = F, quote = F)                
+write.table(macs.ex [1:3], 'rOut/macs2-ex.bed', col.names = F, row.names = F, quote = F, sep = '\t')                
 
 
 ```
